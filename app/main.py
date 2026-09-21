@@ -5,7 +5,7 @@ app = FastAPI(title="Jenkins FastAPI Demo")
 @app.get("/")
 def home():
     return {
-        "message": "Hello from Jenkins CI/CD!", 
+        "message": "Hello from Jenkins!", 
         "version": "1.0.0"
     }
 
