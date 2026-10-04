@@ -100,7 +100,7 @@ pipeline {
 
                     pip install pytest
 
-                    pytest -v
+                    python -m pytest
                 '''
             }
         }
