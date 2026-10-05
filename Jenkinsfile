@@ -179,7 +179,7 @@ pipeline {
             }
         }
 
-       stage('Deploy to EC2') {
+        stage('Deploy to EC2') {
 
             steps {
 
@@ -187,14 +187,21 @@ pipeline {
 
                 sshagent(credentials: ['fastapi-ec2-deploy']) {
 
-                    echo 'SSH Agent block started.'
-
                     sh '''
-                        echo "SSH_AUTH_SOCK=${SSH_AUTH_SOCK}"
+                        set -euxo pipefail
 
-                        echo "Testing loaded SSH keys..."
+                        echo "=============================="
+                        echo "DEPLOYING TO EC2"
+                        echo "=============================="
 
-                        ssh-add -l
+                        echo "Deploy host:"
+                        echo "${DEPLOY_HOST}"
+
+                        echo "Deploy user:"
+                        echo "${DEPLOY_USER}"
+
+                        echo "Image:"
+                        echo "${IMAGE_NAME}:${BUILD_NUMBER}"
 
                         echo "Testing SSH connection..."
 
@@ -203,6 +210,54 @@ pipeline {
                             -o ConnectTimeout=10 \
                             ${DEPLOY_USER}@${DEPLOY_HOST} \
                             "echo 'SSH connection successful'"
+
+                        echo "Logging into ECR on EC2..."
+
+                        ssh \
+                            -o StrictHostKeyChecking=no \
+                            ${DEPLOY_USER}@${DEPLOY_HOST} \
+                            "
+                                aws ecr get-login-password \
+                                    --region ${AWS_REGION} \
+                                | docker login \
+                                    --username AWS \
+                                    --password-stdin \
+                                    ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                            "
+
+                        echo "Pulling Docker image..."
+
+                        ssh \
+                            -o StrictHostKeyChecking=no \
+                            ${DEPLOY_USER}@${DEPLOY_HOST} \
+                            "
+                                docker pull ${IMAGE_NAME}:${BUILD_NUMBER}
+                            "
+
+                        echo "Stopping old container..."
+
+                        ssh \
+                            -o StrictHostKeyChecking=no \
+                            ${DEPLOY_USER}@${DEPLOY_HOST} \
+                            "
+                                docker stop ${APP_NAME} || true
+                                docker rm ${APP_NAME} || true
+                            "
+
+                        echo "Starting new container..."
+
+                        ssh \
+                            -o StrictHostKeyChecking=no \
+                            ${DEPLOY_USER}@${DEPLOY_HOST} \
+                            "
+                                docker run -d \
+                                    --name ${APP_NAME} \
+                                    --restart unless-stopped \
+                                    -p ${APP_PORT}:8000 \
+                                    ${IMAGE_NAME}:${BUILD_NUMBER}
+                            "
+
+                        echo "Deployment completed."
                     '''
                 }
             }
