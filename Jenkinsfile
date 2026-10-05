@@ -188,7 +188,7 @@ pipeline {
                 sshagent(credentials: ['fastapi-ec2-deploy']) {
 
                     sh '''
-                        set -euxo pipefail
+                        set -eux
 
                         echo "=============================="
                         echo "DEPLOYING TO EC2"
